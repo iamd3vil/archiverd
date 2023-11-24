@@ -28,7 +28,7 @@ Usage: archiverd [OPTIONS] --directory <DIRECTORY>
 
 Options:
   -d, --directory <DIRECTORY>   Specify the directory to monitor.
-  -m, --max-files <MAX_FILES>   Set the maximum number of files to keep unarchived.
+  -m, --max-files <MAX_FILES>   Maximum number of archived files to keep.
   -e, --exclude <EXCLUDE>       Define patterns to exclude files from archiving.
   -h, --help                    Display this help message.
   -V, --version                 Show the version of the archiverd.

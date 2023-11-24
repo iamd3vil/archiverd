@@ -7,7 +7,7 @@ pub struct Args {
     #[clap(short, long)]
     pub directory: String,
 
-    /// Maximum number of files to process
+    /// Maximum number of archived files to keep
     #[clap(short = 'n', long)]
     pub max_files: Option<usize>,
 
