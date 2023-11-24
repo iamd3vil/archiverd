@@ -19,6 +19,14 @@ fn main() -> Result<()> {
     println!("Using directory: {}", args.directory);
     println!("Maximum files to process: {:?}", args.max_files);
 
+    if let Err(e) = walk::run_archive_loop(&args) {
+        eprintln!("Error: {}", e);
+    }
+
+    if args.disable_watch {
+        return Ok(());
+    }
+
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
 
@@ -26,10 +34,6 @@ fn main() -> Result<()> {
         r.store(false, Ordering::SeqCst);
     })
     .expect("Error setting Ctrl-C handler");
-
-    if let Err(e) = walk::run_archive_loop(&args) {
-        eprintln!("Error: {}", e);
-    }
 
     let args = args.clone();
     let dir_path = Utf8PathBuf::from(&args.directory);

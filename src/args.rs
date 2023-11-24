@@ -8,9 +8,12 @@ pub struct Args {
     pub directory: String,
 
     /// Maximum number of files to process
-    #[clap(short, long)]
+    #[clap(short = 'n', long)]
     pub max_files: Option<u32>,
 
     #[clap(short, long)]
     pub exclude: Option<String>,
+
+    #[clap(long)]
+    pub disable_watch: bool,
 }
