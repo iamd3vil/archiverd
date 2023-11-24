@@ -1,8 +1,8 @@
 mod args;
 mod walk;
 
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc};
 
 use anyhow::Result;
 use args::Args;
@@ -27,11 +27,10 @@ fn main() -> Result<()> {
         return Ok(());
     }
 
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
+    let (tx, rx): (Sender<u32>, Receiver<u32>) = mpsc::channel();
 
     ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
+        let _ = tx.send(0);
     })
     .expect("Error setting Ctrl-C handler");
 
@@ -48,7 +47,7 @@ fn main() -> Result<()> {
     watcher.watch(dir_path.as_std_path(), notify::RecursiveMode::NonRecursive)?;
 
     println!("Waiting for Ctrl-C...");
-    while running.load(Ordering::SeqCst) {}
+    let _ = rx.recv().unwrap();
     println!("Got it! Exiting...");
 
     Ok(())
