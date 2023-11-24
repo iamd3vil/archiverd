@@ -9,7 +9,7 @@ pub struct Args {
 
     /// Maximum number of files to process
     #[clap(short = 'n', long)]
-    pub max_files: Option<u32>,
+    pub max_files: Option<usize>,
 
     #[clap(short, long)]
     pub exclude: Option<String>,

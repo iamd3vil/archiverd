@@ -9,7 +9,7 @@ use args::Args;
 use camino::Utf8PathBuf;
 use clap::Parser;
 use notify::event::CreateKind;
-use notify::Watcher;
+use notify::{EventKind, Watcher};
 
 use crate::walk::run_archive_loop;
 
@@ -55,13 +55,10 @@ fn main() -> Result<()> {
 }
 
 fn handle_notify_event(event: notify::Event, args: &Args) -> Result<()> {
-    match event.kind {
-        notify::EventKind::Create(CreateKind::File) => {
-            println!("Created: {:?}", event.paths);
+    if let EventKind::Create(CreateKind::File) = event.kind {
+        println!("Created: {:?}", event.paths);
 
-            run_archive_loop(args)?;
-        }
-        _ => {}
+        run_archive_loop(args)?;
     }
 
     Ok(())

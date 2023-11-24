@@ -1,4 +1,8 @@
-use std::fs;
+use std::{
+    fs::{self, DirEntry},
+    path::Path,
+    time::SystemTime,
+};
 use tar::Builder;
 
 use crate::args::Args;
@@ -54,7 +58,7 @@ pub fn run_archive_loop(args: &Args) -> Result<()> {
         let mut builder = Builder::new(file);
 
         // Add the file to the tar.
-        builder.append_path_with_name(&path, &path.file_name().unwrap())?;
+        builder.append_path_with_name(&path, path.file_name().unwrap())?;
 
         // Finish writing the tar file.
         builder.finish()?;
@@ -77,6 +81,41 @@ pub fn run_archive_loop(args: &Args) -> Result<()> {
 
         Ok(())
     })?;
+
+    // Keep only the latest n files.
+    if let Some(max_files) = args.max_files {
+        keep_latest_n_files(&dir, max_files)?;
+    }
+
+    Ok(())
+}
+
+fn keep_latest_n_files<P: AsRef<Path>>(dir: P, n: usize) -> Result<()> {
+    let mut entries: Vec<DirEntry> = fs::read_dir(dir)?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            let p = Utf8PathBuf::try_from(entry.path()).unwrap();
+            p.to_string().ends_with(".tar.gz")
+        })
+        .collect();
+
+    // Sort files by modified time, newest first
+    entries.sort_by(|a, b| {
+        let a_time = a
+            .metadata()
+            .and_then(|m| m.created())
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+        let b_time = b
+            .metadata()
+            .and_then(|m| m.created())
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+        b_time.cmp(&a_time)
+    });
+
+    // Keep only the latest n files
+    for entry in entries.into_iter().skip(n) {
+        fs::remove_file(entry.path())?;
+    }
 
     Ok(())
 }
