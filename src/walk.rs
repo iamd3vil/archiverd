@@ -1,5 +1,7 @@
+use human_size::Size;
 use std::{
     fs::{self, DirEntry},
+    io::Write,
     path::Path,
     time::SystemTime,
 };
@@ -8,12 +10,12 @@ use tar::Builder;
 use crate::args::Args;
 use anyhow::{Context, Result};
 use camino::Utf8PathBuf;
-use flate2::write::ZlibEncoder;
+use flate2::bufread::GzEncoder;
 use glob::Pattern;
 use rayon::prelude::*;
 
 pub fn run_archive_loop(args: &Args) -> Result<()> {
-    let dir = Utf8PathBuf::try_from(&args.directory).context("converting to Utf8PathBuf")?;
+    let dir = Utf8PathBuf::from(&args.directory);
     let exclude_glob = args
         .exclude
         .as_ref()
@@ -50,8 +52,18 @@ pub fn run_archive_loop(args: &Args) -> Result<()> {
             }
         }
 
+        // Check if min size is given and the file is of minimum size.
+        if let Some(min_size_str) = &args.keep_min_size {
+            // Parse the give size into bytes.
+            let min_size: Size = min_size_str.parse().context("couldn't parse min size")?;
+            println!("min size: {min_size}");
+
+            keep_file_min_size(&path, min_size.value() as u64)?;
+            return Ok(());
+        }
+
         // Create a tar file with the file.
-        let tar_path = Utf8PathBuf::try_from(format!("{}.tar", path))?;
+        let tar_path = Utf8PathBuf::from(format!("{}.tar", path));
         println!("Creating tar file: {:?}", tar_path);
 
         let file = fs::File::create(&tar_path)?;
@@ -69,9 +81,13 @@ pub fn run_archive_loop(args: &Args) -> Result<()> {
 
         let tar_file = fs::File::open(&tar_path)?;
         let gz_file = fs::File::create(&gz_path)?;
-        let mut encoder = ZlibEncoder::new(gz_file, flate2::Compression::default());
+        let mut gz_writer = std::io::BufWriter::new(gz_file);
+        let gz_reader = std::io::BufReader::new(tar_file);
+        let mut encoder = GzEncoder::new(gz_reader, flate2::Compression::default());
 
-        std::io::copy(&mut std::io::BufReader::new(tar_file), &mut encoder)?;
+        std::io::copy(&mut encoder, &mut gz_writer)?;
+
+        gz_writer.flush()?;
 
         // Delete the tar file.
         fs::remove_file(&tar_path)?;
@@ -115,6 +131,16 @@ fn keep_latest_n_files<P: AsRef<Path>>(dir: P, n: usize) -> Result<()> {
     // Keep only the latest n files
     for entry in entries.into_iter().skip(n) {
         fs::remove_file(entry.path())?;
+    }
+
+    Ok(())
+}
+
+fn keep_file_min_size(file: &Utf8PathBuf, min_size: u64) -> Result<()> {
+    let meta = fs::metadata(file)?;
+    if meta.len() < min_size {
+        println!("Deleting file: {:?}", file);
+        fs::remove_file(file)?;
     }
 
     Ok(())

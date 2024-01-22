@@ -14,6 +14,10 @@ pub struct Args {
     #[clap(short, long)]
     pub exclude: Option<String>,
 
+    /// Only keep files with minimum file size. Example: 1 MB, 1 GB
+    #[clap(short, long)]
+    pub keep_min_size: Option<String>,
+
     #[clap(long)]
     pub disable_watch: bool,
 }
