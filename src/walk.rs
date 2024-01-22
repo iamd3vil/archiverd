@@ -1,7 +1,7 @@
 use human_size::Size;
 use std::{
-    fs::{self, DirEntry},
-    io::Write,
+    fs::{self, DirEntry, File},
+    io::BufWriter,
     path::Path,
     time::SystemTime,
 };
@@ -10,7 +10,7 @@ use tar::Builder;
 use crate::args::Args;
 use anyhow::{Context, Result};
 use camino::Utf8PathBuf;
-use flate2::bufread::GzEncoder;
+use flate2::{write::GzEncoder, Compression};
 use glob::Pattern;
 use rayon::prelude::*;
 
@@ -63,37 +63,7 @@ pub fn run_archive_loop(args: &Args) -> Result<()> {
         }
 
         // Create a tar file with the file.
-        let tar_path = Utf8PathBuf::from(format!("{}.tar", path));
-        println!("Creating tar file: {:?}", tar_path);
-
-        let file = fs::File::create(&tar_path)?;
-        let mut builder = Builder::new(file);
-
-        // Add the file to the tar.
-        builder.append_path_with_name(&path, path.file_name().unwrap())?;
-
-        // Finish writing the tar file.
-        builder.finish()?;
-
-        // Create a gzip file with the tar file using the flate2 crate.
-        let gz_path = tar_path.with_extension("tar.gz");
-        println!("Creating gz file: {:?}", gz_path);
-
-        let tar_file = fs::File::open(&tar_path)?;
-        let gz_file = fs::File::create(&gz_path)?;
-        let mut gz_writer = std::io::BufWriter::new(gz_file);
-        let gz_reader = std::io::BufReader::new(tar_file);
-        let mut encoder = GzEncoder::new(gz_reader, flate2::Compression::default());
-
-        std::io::copy(&mut encoder, &mut gz_writer)?;
-
-        gz_writer.flush()?;
-
-        // Delete the tar file.
-        fs::remove_file(&tar_path)?;
-
-        // Delete the file.
-        fs::remove_file(&path)?;
+        create_tar_gz(path)?;
 
         Ok(())
     })?;
@@ -102,6 +72,31 @@ pub fn run_archive_loop(args: &Args) -> Result<()> {
     if let Some(max_files) = args.max_files {
         keep_latest_n_files(&dir, max_files)?;
     }
+
+    Ok(())
+}
+
+fn create_tar_gz(path: Utf8PathBuf) -> Result<()> {
+    // Replace 'path' with your file's path
+    let gz_path = Utf8PathBuf::from(format!("{}.tar.gz", path));
+    println!("Creating tar.gz file: {:?}", gz_path);
+
+    // Create the gzip file
+    let gz_file = File::create(gz_path)?;
+    let gz_writer = BufWriter::new(gz_file);
+    let gz_encoder = GzEncoder::new(gz_writer, Compression::default());
+
+    // Create a tar builder with the gzip encoder
+    let mut builder = Builder::new(gz_encoder);
+
+    // Add the file to the tar
+    builder.append_path_with_name(&path, path.file_name().unwrap())?;
+
+    // Finish writing the tar.gz file
+    builder.into_inner()?.finish()?;
+
+    // Delete the original file
+    std::fs::remove_file(path)?;
 
     Ok(())
 }
